@@ -3,6 +3,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalJson, sha256Bytes } from './canonical.js';
 import { compareTrajectories, profileTrajectory, validateTrajectory } from './context-evidence.js';
+import { validateRunRecord } from './run-record.js';
+import {
+  summarizeCumulativeValue,
+  summarizeRunRecord,
+  trajectoryOperatorIndicator,
+  valueSummaryOperatorIndicator,
+} from './value-summary.js';
 
 function parseJson(bytes, label) {
   try {
@@ -21,19 +28,7 @@ function line(value) {
 }
 
 export function humanSummary(profile) {
-  if (!profile.measurements) {
-    return `${profile.run_id ?? '(unknown run)'}: ${profile.measurement_status}; ${profile.violations.length} violation(s)\n`;
-  }
-  const value = profile.measurements;
-  return [
-    `${profile.run_id} [${profile.arm_id}/${profile.configuration_id}]`,
-    `raw ${value.raw_available_bytes} bytes`,
-    `initial ${value.initial_model_visible_bytes} bytes`,
-    `escalated ${value.escalated_model_visible_bytes} bytes`,
-    `final ${value.final_model_visible_bytes} bytes`,
-    `requested ${value.escalation_requested_count}`,
-    `fulfilled ${value.escalation_fulfilled_count}`,
-  ].join(' | ') + '\n';
+  return trajectoryOperatorIndicator(profile);
 }
 
 export async function conformanceReport(directory) {
@@ -91,15 +86,46 @@ export async function conformanceReport(directory) {
 
 export async function runCli(argv, io = process) {
   const [command, ...args] = argv;
-  const summary = args.includes('--summary');
-  const positional = args.filter((arg) => arg !== '--summary');
+  const quiet = args.includes('--quiet');
+  const cumulative = args.includes('--cumulative');
+  const knownFlags = new Set(['--summary', '--quiet', '--cumulative']);
+  const positional = args.filter((arg) => !knownFlags.has(arg));
   try {
     if (command === 'profile' || command === 'validate') {
       if (positional.length !== 1) throw new Error(`${command} requires one trajectory file`);
       const input = await readJson(positional[0]);
       const trajectory = input.trajectory ?? input;
-      const result = command === 'profile' ? profileTrajectory(trajectory) : validateTrajectory(trajectory);
-      io.stdout.write(summary && command === 'profile' ? humanSummary(result) : line(result));
+      const checked = validateTrajectory(trajectory);
+      const result = command === 'profile'
+        ? profileTrajectory(trajectory)
+        : { valid: checked.valid, violations: checked.violations };
+      io.stdout.write(line(result));
+      if (!quiet) {
+        io.stderr.write(command === 'profile'
+          ? trajectoryOperatorIndicator(result)
+          : `[Trajectory Profiler] ${trajectory.run?.run_id ?? 'unknown run'} | trajectory ${result.valid ? 'valid' : 'rejected'} | ${result.violations.length} violation(s)\n`);
+      }
+      return result.valid ? 0 : 1;
+    }
+    if (command === 'validate-record') {
+      if (positional.length !== 1) throw new Error('validate-record requires one observational run-record file');
+      const record = await readJson(positional[0]);
+      const checked = validateRunRecord(record);
+      const result = { valid: checked.valid, violations: checked.violations };
+      io.stdout.write(line(result));
+      if (!quiet) {
+        io.stderr.write(`[Trajectory Profiler] ${record.run?.id ?? 'unknown run'} | observational record ${result.valid ? 'valid' : 'rejected'} | ${result.violations.length} violation(s)\n`);
+      }
+      return result.valid ? 0 : 1;
+    }
+    if (command === 'value-summary') {
+      if (positional.length === 0) throw new Error('value-summary requires at least one observational run-record file');
+      const records = await Promise.all(positional.map(readJson));
+      const result = cumulative || records.length > 1
+        ? summarizeCumulativeValue(records)
+        : summarizeRunRecord(records[0]);
+      io.stdout.write(line(result));
+      if (!quiet) io.stderr.write(valueSummaryOperatorIndicator(result));
       return result.valid ? 0 : 1;
     }
     if (command === 'compare') {
@@ -107,24 +133,20 @@ export async function runCli(argv, io = process) {
       const inputs = await Promise.all(positional.map(readJson));
       const result = compareTrajectories(inputs.map((input) => input.trajectory ?? input));
       io.stdout.write(line(result));
+      if (!quiet) {
+        io.stderr.write(`[Trajectory Profiler] ${result.profiles.length} trajectories compared | ${result.comparable ? 'comparable' : `not comparable: ${result.reason}`}\n`);
+      }
       return result.comparable ? 0 : 1;
     }
     if (command === 'conformance') {
       if (positional.length > 1) throw new Error('conformance accepts at most one fixture directory');
       const defaultDirectory = fileURLToPath(new URL('../fixtures/context-firewall/', import.meta.url));
       const result = await conformanceReport(positional[0] ?? defaultDirectory);
-      if (summary) {
-        for (const item of result.results) {
-          const value = item.actual;
-          io.stdout.write(value == null
-            ? `${item.fixture} | ${item.evidence_validation_state} | ${item.pass ? 'PASS' : 'FAIL'}\n`
-            : `${item.fixture} | raw ${value.raw_bytes} | initial ${value.initial_visible_bytes} | escalated ${value.escalated_bytes} | final ${value.final_visible_bytes} | ${item.pass ? 'PASS' : 'FAIL'}\n`);
-        }
-        io.stdout.write(`${result.conformance}: ${result.fixture_count} fixtures\n`);
-      } else io.stdout.write(line(result));
+      io.stdout.write(line(result));
+      if (!quiet) io.stderr.write(`[Trajectory Profiler] ${result.fixture_count} fixtures checked | ${result.conformance}\n`);
       return result.conformance === 'PASS' ? 0 : 1;
     }
-    throw new Error('usage: agent-trajectory-profiler <profile|validate|compare|conformance> ...');
+    throw new Error('usage: agent-trajectory-profiler <profile|validate|validate-record|value-summary|compare|conformance> ...');
   } catch (error) {
     io.stderr.write(line({ code: 'INVALID_INVOCATION', message: error.message }));
     return 2;

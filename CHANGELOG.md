@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 - 2026-08-25
+
+- Added dependency-free `opsle.value-receipt.v1` validation and semantic
+  identity with caller timestamp exclusion.
+- Added observational run records and deterministic per-run/cumulative Opsle
+  Value summaries with class-, unit-, revision-, configuration-, and trust-aware
+  safe aggregation.
+- Added Context Firewall and Decision Evidence receipt support without circular
+  runtime dependencies or experimental evidence.
+- Separated canonical stdout from one named `[Trajectory Profiler]` stderr
+  indicator and added local static/determinism verification scripts.
+
 ## 0.2.0 - 2026-08-25
 
 - Added packet-v1 raw/reduced, suppression, escalation, final-visible, and

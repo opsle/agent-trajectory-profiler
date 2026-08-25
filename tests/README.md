@@ -5,3 +5,8 @@ Tests must map to named invariants in SPEC.md, include adversarial failure cases
 The packet-v1 suite asserts exact byte/event totals, escalation transitions,
 deduplication, invalid-state detection, canonical output, immutable fixture
 expectations, and exact-revision interoperability without model/provider runs.
+
+Visible Value tests cover receipt schema and claim ceilings, timestamp-excluded
+identity, observational missingness, mechanism/run binding, quality-class
+preservation, safe partitioned aggregation, deterministic summaries, and
+canonical stdout versus named stderr operator telemetry.

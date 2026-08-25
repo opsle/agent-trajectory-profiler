@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { readFile, readdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { canonicalJson, sha256Bytes } from '../src/canonical.js';
+import { validateValueReceipt } from '../src/value-receipt.js';
+import { summarizeRunRecord } from '../src/value-summary.js';
 import { buildFixtureCorpus } from './context-firewall-fixture-corpus.js';
 
 const contextFirewallPath = resolve(process.env.CONTEXT_FIREWALL_PATH ?? '../context-firewall');
@@ -19,6 +22,7 @@ const corpusExact = canonicalJson(generated) === canonicalJson(stored);
 const reducer = await import(pathToFileURL(resolve(contextFirewallPath, 'src/reducer.js')));
 const producerFixtures = await import(pathToFileURL(resolve(contextFirewallPath, 'fixtures/corpus.js')));
 const validator = await import(pathToFileURL(resolve(decisionEvidencePath, 'src/context-firewall-v1.js')));
+const decisionValue = await import(pathToFileURL(resolve(decisionEvidencePath, 'src/context-firewall-value.js')));
 const upstreamByName = new Map(producerFixtures.corpus.map((item) => [item.name, item]));
 
 function upstream(name, { tamperReceipt = false } = {}) {
@@ -64,6 +68,61 @@ const uniqueFulfilledBytes = [...new Map(fulfilledExposures.map((event) => [
 ])).values()].reduce((sum, bytes) => sum + bytes, 0);
 const tamperedUpstream = upstream('normal/small-all-pass', { tamperReceipt: true });
 
+const valueFixture = upstreamByName.get('normal/large-all-pass');
+const { packet: valuePacket, valueReceipt: contextValueReceipt } = reducer.reduceWithValueReceipt(
+  valueFixture.input,
+  { mechanismRevision: generated[0].provenance.context_firewall_revision },
+);
+const valueValidation = validator.validateContextFirewallPacket(valuePacket, {
+  packetBytes: reducer.serializePacket(valuePacket),
+  sourceInput: valueFixture.input,
+});
+const decisionValueReceipt = decisionValue.createValidationValueReceipt(
+  valuePacket,
+  valueValidation,
+  { mechanismRevision: generated[0].provenance.decision_evidence_revision },
+);
+const mechanism = (receipt) => ({
+  configuration_id: receipt.operation.configuration_id,
+  id: receipt.mechanism.id,
+  name: receipt.mechanism.name,
+  policy_id: receipt.operation.policy_id,
+  revision: receipt.mechanism.revision,
+  version: receipt.mechanism.version,
+});
+const valueRunRecord = {
+  mechanisms: [mechanism(contextValueReceipt), mechanism(decisionValueReceipt)],
+  protocol_version: 'opsle.agent-trajectory-profiler.run-record/v1',
+  run: {
+    id: contextValueReceipt.run.id,
+    project: 'Opsle Prompt 005',
+    repository: 'opsle/agent-trajectory-profiler',
+    task_classification: 'conformance',
+    work_classification: 'public-synthetic',
+  },
+  telemetry: {
+    initial_model_visible_bytes: valuePacket.receipt.measurements.reduced_bytes,
+    raw_evidence_bytes: valuePacket.receipt.measurements.original_bytes,
+  },
+  value_receipts: [contextValueReceipt, decisionValueReceipt],
+};
+const valueSummary = summarizeRunRecord(valueRunRecord);
+const valueChain = {
+  context_receipt_valid: validateValueReceipt(contextValueReceipt).valid,
+  decision_receipt_valid: validateValueReceipt(decisionValueReceipt).valid,
+  initial_model_visible_bytes: valuePacket.receipt.measurements.reduced_bytes,
+  measurement_count: valueSummary.measurement_count,
+  raw_bytes: valuePacket.receipt.measurements.original_bytes,
+  receipt_count: valueSummary.receipt_count,
+  safe_aggregate_count: valueSummary.aggregates?.length ?? 0,
+  summary_identity: valueSummary.summary_identity,
+  summary_valid: valueSummary.valid,
+};
+valueChain.pass = valueChain.context_receipt_valid
+  && valueChain.decision_receipt_valid
+  && valueChain.summary_valid
+  && valueChain.receipt_count === 2;
+
 const independent = {
   'high-reduction-success': packetAssertions('high-reduction-success', 'normal/large-all-pass')
     && high.expected.measurements.effective_reduction.bytes_avoided
@@ -89,10 +148,12 @@ const cases = Object.entries(independent).map(([fixture, independentlyVerified])
 }));
 const report = {
   cases,
-  conformance: corpusExact && cases.every((item) => item.pass) ? 'PASS' : 'FAIL',
+  conformance: corpusExact && cases.every((item) => item.pass) && valueChain.pass ? 'PASS' : 'FAIL',
   fixture_count: generated.length,
+  profiler_revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
   protocol_version: 'opsle.agent-trajectory-profiler.context-firewall-interop/v1',
   stored_corpus_exact: corpusExact,
+  visible_value_chain: valueChain,
 };
 process.stdout.write(`${canonicalJson(report)}\n`);
 process.exitCode = report.conformance === 'PASS' ? 0 : 1;

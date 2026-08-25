@@ -1,6 +1,6 @@
 {
   "name": "@opsle/agent-trajectory-profiler",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "exports": "./src/index.js",
@@ -8,9 +8,12 @@
     "agent-trajectory-profiler": "./bin/agent-trajectory-profiler.js"
   },
   "scripts": {
+    "check": "node --check src/canonical.js && node --check src/metrics.js && node --check src/context-evidence.js && node --check src/value-receipt.js && node --check src/run-record.js && node --check src/value-summary.js && node --check src/cli.js",
     "test": "node --test",
     "conformance": "node ./bin/agent-trajectory-profiler.js conformance",
-    "interop": "node ./tools/verify-context-firewall-interop.js"
+    "interop": "node ./tools/verify-context-firewall-interop.js",
+    "determinism": "node --test --test-name-pattern=deterministic",
+    "verify": "npm run check && npm test && npm run conformance && npm run interop && npm run determinism"
   },
   "engines": {
     "node": ">=20"

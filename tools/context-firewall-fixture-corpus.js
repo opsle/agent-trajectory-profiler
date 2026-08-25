@@ -10,8 +10,8 @@ import {
   rawBaselineEvent,
 } from '../src/context-evidence.js';
 
-export const EXPECTED_CONTEXT_FIREWALL_REVISION = 'dd34bd9f681314761f1ca87f339648bf611811f3';
-export const EXPECTED_DECISION_EVIDENCE_REVISION = 'cc220abfa27a0bd20d80c481da09f6fe532bdabc';
+export const EXPECTED_CONTEXT_FIREWALL_REVISION = '953c48f1cfd154d6b7ed10b51b87fe54e4df45f2';
+export const EXPECTED_DECISION_EVIDENCE_REVISION = 'b17ae3b41cea7cb0b9e0befe43e885b5aa0e4a09';
 
 function revision(path) {
   return execFileSync('git', ['-C', path, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();

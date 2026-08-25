@@ -450,4 +450,5 @@ test('CLI profile output is canonical and deterministic', () => {
   assert.equal(first.status, 0, first.stderr);
   assert.equal(first.stdout, second.stdout);
   assert.equal(first.stdout.endsWith('\n'), true);
+  assert.equal(first.stderr, '[Trajectory Profiler] escalation-fulfilled | 2130 B initially visible | 2146 B final | 1 escalation fulfilled\n');
 });
