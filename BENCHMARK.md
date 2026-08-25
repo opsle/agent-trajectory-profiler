@@ -29,6 +29,19 @@ Bytes, tokens, events, lines, characters, latency, and cost are separate units.
 Payload reduction is not equivalent to token reduction unless provider-recorded
 token usage is separately supplied.
 
+## Observational production telemetry
+
+Ordinary run records may accumulate invocation, exact byte/event, validation,
+escalation, failure/recovery, tool-call, child-execution, polling, passive-wait,
+provider-token, and outcome observations when those values are actually
+available. Missing fields remain missing. This corpus describes normal usage;
+it does not establish that a mechanism caused lower cost, fewer tokens, lower
+latency, preserved correctness, or an avoided failure.
+
+Measurement classes remain part of every value. Cumulative summaries never
+flatten exact, observed, estimated, modeled, or experimental evidence. Ordinary
+observational records reject experimental measurements.
+
 ## Repetition and reporting
 
 Record model, provider, model version, reasoning effort, tool versions, fixture, prompt, environment/hardware, repetition count, observable tool activity, final result, correctness, cost/tokens when available, and known confounders. Report distributions and raw observations; never invent missing values.

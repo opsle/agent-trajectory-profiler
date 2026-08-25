@@ -17,6 +17,12 @@ and tool-evidence exposure from observable execution artifacts. Context
 Firewall packet-v1 receipts become append-only trajectory events without either
 upstream package becoming a runtime dependency.
 
+The profiler also ingests the program-wide `opsle.value-receipt.v1` contract
+from Context Firewall, Decision Evidence, and other conforming mechanisms. It
+preserves measurement class and trust, builds deterministic per-run or
+cumulative Opsle Value summaries, and aggregates only explicitly summable,
+compatible observations.
+
 ## Why it matters
 
 The Opsle thesis asks: **What if we stopped using intelligence for work that doesn’t require intelligence?** This project isolates one candidate boundary so it can be falsified and measured independently.
@@ -47,25 +53,48 @@ expansion directly.
 The dependency-free CLI accepts a bare trajectory or a fixture wrapper:
 
 ```bash
-node bin/agent-trajectory-profiler.js \
+./bin/agent-trajectory-profiler.js \
   profile \
   fixtures/context-firewall/high-reduction-success.json
 ```
 
-Use `--summary` for concise output. `npm test` and `npm run conformance`
-require no sibling repository or mutable external state. `npm run interop` is a
-development proof against exact sibling Context Firewall and Decision Evidence
-Protocol checkouts.
+Canonical machine JSON is always written to stdout. One concise
+`[Trajectory Profiler]` completion indicator is written to stderr; `--quiet`
+suppresses only that indicator. The legacy `--summary` flag is accepted as a
+compatibility alias but no longer replaces machine output.
+
+Profile an observational value record with:
+
+```bash
+./bin/agent-trajectory-profiler.js \
+  value-summary \
+  run-record.json
+```
+
+Pass multiple records, or `--cumulative`, for a cumulative summary. Use
+`validate-record` for validation without summary projection. `npm test` and
+`npm run conformance` require no sibling repository or mutable external state.
+`npm run interop` remains the development proof against exact sibling Context
+Firewall and Decision Evidence Protocol checkouts.
 
 The package API exports packet/raw adapters, escalation-event construction,
 trajectory validation/profiling/comparison, protocol constants, and canonical
 measurement serialization from `src/index.js`.
+
+The value API additionally exports receipt validation/identity, observational
+run-record validation/identity, deterministic summary functions, and named
+operator-indicator formatters. See [Visible Value telemetry](docs/VISIBLE_VALUE.md).
 
 ## Units and interpretation
 
 Payload values are exact UTF-8 bytes. Evidence values are event counts. Neither
 is a character, line, token, latency, or cost count. Optional token fields are
 accepted only when labeled `PROVIDER_RECORDED` and remain separate.
+
+Value-receipt aggregation partitions by mechanism, revision, configuration,
+policy, measurement identity, unit, class, direction, and evidence trust.
+Ratios, percentages, booleans, states, estimates, models, and experiments are
+never directly summed. Missing observational fields remain missing.
 
 **Payload reduction is not equivalent to token reduction unless token usage is
 separately measured.**
@@ -132,8 +161,9 @@ A small dependency-free reference prototype is included for falsification and in
 Deduplication is exact only within an operation when exposures share an explicit
 content identity and byte size. Overlap with a different identity cannot be
 proved safely and is counted in full. The adapter supports Context Firewall
-packet-v1 only. Correctness preservation, token/cost savings, and a safe
-reduction frontier remain unmeasured.
+packet-v1 only for trajectory-event construction; the Visible Value path accepts
+any conforming Opsle receipt. Correctness preservation, token/cost savings, and
+a safe reduction frontier remain unmeasured.
 
 ## License
 
