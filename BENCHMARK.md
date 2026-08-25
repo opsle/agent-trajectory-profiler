@@ -20,6 +20,14 @@ Efficiency results are comparable only when every candidate passes the same dete
 - semantic region revisit rate
 - revisit cause distribution
 - tokens, cost, latency, and tool calls
+- raw, initial-visible, escalated-visible, and final-visible evidence bytes
+- retained, suppressed, and ambiguous source-event counts
+- escalation requested, fulfilled, and unavailable counts
+- initial and effective byte reduction
+
+Bytes, tokens, events, lines, characters, latency, and cost are separate units.
+Payload reduction is not equivalent to token reduction unless provider-recorded
+token usage is separately supplied.
 
 ## Repetition and reporting
 
@@ -34,3 +42,9 @@ Record model, provider, model version, reasoning effort, tool versions, fixture,
 ## Result policy
 
 Retain positive, negative, null, and failed experiments. Update maturity only when the actual stated hypothesis has reproducible evidence.
+
+## EXP-001 boundary
+
+The packet-v1 corpus is measurement-conformance evidence, not the EXP-001 task
+dataset, correctness oracle, arm harness, or a model result. Reduced payload does
+not establish preserved model correctness.
