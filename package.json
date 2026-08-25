@@ -1,9 +1,18 @@
 {
   "name": "@opsle/agent-trajectory-profiler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
+  "exports": "./src/index.js",
+  "bin": {
+    "agent-trajectory-profiler": "./bin/agent-trajectory-profiler.js"
+  },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "conformance": "node ./bin/agent-trajectory-profiler.js conformance",
+    "interop": "node ./tools/verify-context-firewall-interop.js"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
