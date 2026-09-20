@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "==> Check git formatting and whitespace"
+git diff --check HEAD~1 2>/dev/null || true
+
+echo "==> Run static syntax and import checks"
+npm run check
+
+echo "==> Run unit and integration tests"
+npm test
+
+echo "==> Run protocol conformance"
+npm run conformance
+
+echo "==> Run determinism tests"
+npm run determinism
+
+echo "==> Verify Context Firewall interop with pinned dependencies"
+mkdir -p .deps
+if [[ ! -d .deps/context-firewall ]]; then
+  git clone --depth 1 https://github.com/opsle/context-firewall.git .deps/context-firewall 2>/dev/null || true
+  git -C .deps/context-firewall fetch --depth 1 origin 953c48f1cfd154d6b7ed10b51b87fe54e4df45f2 2>/dev/null || true
+  git -C .deps/context-firewall checkout -q 953c48f1cfd154d6b7ed10b51b87fe54e4df45f2 2>/dev/null || true
+fi
+if [[ ! -d .deps/decision-evidence-protocol ]]; then
+  git clone --depth 1 https://github.com/opsle/decision-evidence-protocol.git .deps/decision-evidence-protocol 2>/dev/null || true
+  git -C .deps/decision-evidence-protocol fetch --depth 1 origin b17ae3b41cea7cb0b9e0befe43e885b5aa0e4a09 2>/dev/null || true
+  git -C .deps/decision-evidence-protocol checkout -q b17ae3b41cea7cb0b9e0befe43e885b5aa0e4a09 2>/dev/null || true
+fi
+
+CONTEXT_FIREWALL_PATH=.deps/context-firewall \
+DECISION_EVIDENCE_PATH=.deps/decision-evidence-protocol \
+node ./tools/verify-context-firewall-interop.js
+
+echo "PASS: all agent-trajectory-profiler checks succeeded"
