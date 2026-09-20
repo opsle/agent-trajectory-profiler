@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fail-closed deployment for agent-trajectory-profiler
+# Usage: ops/ci/deploy <SHA>
+
+sha="${1:-}"
+if [[ -z "$sha" ]]; then
+  echo "usage: $0 <SHA>" >&2
+  exit 2
+fi
+
+root="${OPSLE_COMPONENT_ROOT:-/opt/opsle-components/agent-trajectory-profiler}"
+releases_dir="$root/releases"
+current_symlink="$root/current"
+receipts_dir="$root/receipts"
+
+# Reject if workspace is dirty
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "deploy: the checkout is not clean" >&2
+  exit 1
+fi
+
+# Reject if sha is superseded on origin/main
+current_origin_sha="$(git rev-parse origin/main)"
+if [[ "$sha" != "$current_origin_sha" ]]; then
+  echo "deploy: $sha is not the tip of main ($current_origin_sha); superseded, nothing deployed" >&2
+  exit 75
+fi
+
+target_dir="$releases_dir/$sha"
+mkdir -p "$target_dir" "$receipts_dir"
+
+# Export git archive to release directory
+git archive "$sha" | tar -x -C "$target_dir"
+
+# Atomically flip symlink
+ln -sfn "$target_dir" "$current_symlink.tmp"
+mv -Tf "$current_symlink.tmp" "$current_symlink"
+
+# Write deployment receipt
+receipt_file="$receipts_dir/deploy-$sha.json"
+cat >"$receipt_file" <<EOF
+{
+  "component": "agent-trajectory-profiler",
+  "sha": "$sha",
+  "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "deployer": "${USER:-unknown}",
+  "status": "deployed",
+  "path": "$target_dir"
+}
+EOF
+
+echo "deploy: successfully deployed $sha to $target_dir"

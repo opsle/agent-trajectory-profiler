@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fail-closed post-deployment verification for agent-trajectory-profiler
+# Usage: ops/ci/verify <SHA>
+
+sha="${1:-}"
+if [[ -z "$sha" ]]; then
+  echo "usage: $0 <SHA>" >&2
+  exit 2
+fi
+
+root="${OPSLE_COMPONENT_ROOT:-/opt/opsle-components/agent-trajectory-profiler}"
+current_symlink="$root/current"
+receipt_file="$root/receipts/deploy-$sha.json"
+
+if [[ ! -f "$receipt_file" ]]; then
+  echo "verify: missing deployment receipt $receipt_file" >&2
+  exit 1
+fi
+
+if [[ ! -d "$current_symlink" ]]; then
+  echo "verify: missing current symlink $current_symlink" >&2
+  exit 1
+fi
+
+echo "==> Verifying deployed component via conformance"
+node "$current_symlink/bin/agent-trajectory-profiler.js" conformance
+
+echo "verify: component agent-trajectory-profiler at $sha passed verification"

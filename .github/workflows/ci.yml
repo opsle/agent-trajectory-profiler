@@ -9,24 +9,19 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  quality:
+    runs-on: [self-hosted, linux, x64, platform-ci, agent-trajectory-profiler]
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          node-version: 20
-      - name: Fetch pinned public dependencies
-        run: |
-          git clone \
-            https://github.com/opsle/context-firewall.git \
-            ../context-firewall
-          git -C ../context-firewall checkout \
-            953c48f1cfd154d6b7ed10b51b87fe54e4df45f2
-          git clone \
-            https://github.com/opsle/decision-evidence-protocol.git \
-            ../decision-evidence-protocol
-          git -C ../decision-evidence-protocol checkout \
-            b17ae3b41cea7cb0b9e0befe43e885b5aa0e4a09
-      - run: npm run verify
+          fetch-depth: 0
+
+      - name: TEST
+        run: ops/ci/test
